@@ -32,7 +32,38 @@
 #define BAMF_Y_POSITION               6
 #define BAMF_CHAR                     "B"
 
-void* currentScreen = NULL;
+// Enum type to represent each of the screens
+enum Screen {
+    GPS_LOCK_SCREEN,
+    READY_SCREEN,
+    MAIN_SCREEN,
+    BOOTING_SCREEN,
+    SUMMARY_SCREEN
+};
+
+// Global variable to store the current screen
+Screen currentScreen;
+
+// Function to redraw the current screen
+void redrawCurrentScreen(String device_id, double speed, double topSpeed) {
+    switch (currentScreen) {
+        case GPS_LOCK_SCREEN:
+            drawGPSLockScreen(device_id);
+            break;
+        case READY_SCREEN:
+            drawReadyScreen(device_id);
+            break;
+        case MAIN_SCREEN:
+            drawMainScreen(device_id, speed);
+            break;
+        case BOOTING_SCREEN:
+            drawBootingScreen();
+            break;
+        case SUMMARY_SCREEN:
+            drawSummaryScreen(topSpeed);
+            break;
+    }
+}
 
 //
 // Lat Lng pair
@@ -51,9 +82,8 @@ typedef struct _RUN_INFORMATION {
   GpsCoordinate finishLine_right;
   double high_speed;
   double bamf_speed;
-  String UploadServerIP;
-  String UploadSSID;
-  String UploadPassword;
+  uint8_t heat_number;
+  String upload_server_ip;
 } RUN_INFORMATION;
 
 RUN_INFORMATION runInformation;
@@ -198,8 +228,6 @@ bool crossFinishLine(struct GpsCoordinate finishLineLeft, struct GpsCoordinate f
 
 void drawAttentionScreen(String attentionString) {
 
-  currentScreen = (void*)&drawAttentionScreen;
-
   // Clear the display
   u8g2.clearBuffer();
 
@@ -217,7 +245,7 @@ void drawAttentionScreen(String attentionString) {
 }
 
 void drawGPSLockScreen(String device_id) {
-  currentScreen = (void*)&drawAttentionScreen;
+  currentScreen = GPS_LOCK_SCREEN;
   
   ledEnableRed();
 
@@ -255,6 +283,8 @@ void drawGPSLockScreen(String device_id) {
 
 
 void drawReadyScreen(String device_id) {
+  currentScreen = READY_SCREEN;
+
   u8g2.clearBuffer(); // clear the buffer
   
   // Top section
@@ -274,6 +304,7 @@ void drawReadyScreen(String device_id) {
 }
 
 void drawMainScreen(String deviceId, double speed) {
+  currentScreen = MAIN_SCREEN;
   u8g2.clearBuffer(); // clear the buffer
   
   // Top section
@@ -282,7 +313,7 @@ void drawMainScreen(String deviceId, double speed) {
   
   // Speed section
   u8g2.setFont(u8g2_font_fub20_tr); // set font size to 30
-  char speedStr[7];
+  char speedStr[7] = {0};
   sprintf(speedStr, "%06.2f", speed); // format speed with two decimal places and leading zeros if needed
   u8g2.drawStr(0, 60, speedStr); // draw speed
   u8g2.setFont(u8g2_font_fub14_tr); // set font size to 30  
@@ -318,6 +349,7 @@ void drawBootingScreen() {
 }
 
 void drawSummaryScreen(double topSpeed) {
+  currentScreen = SUMMARY_SCREEN;
   u8g2.clearBuffer(); // clear the buffer
   
   // Top section
@@ -352,9 +384,13 @@ void processRunState()
       (lastMillis <= 0)) {
     lastMillis = millis();
 
-    if (mph < 2.0) {
-      mph = 0;
+    if (mph < 2.00) {
+      drawMainScreen(runInformation.device_id + "-" + runInformation.heat_number, 0.00);
+    } else {
+      drawMainScreen(runInformation.device_id + "-" + runInformation.heat_number, mph);
     }
+
+    drawMainScreen(runInformation.device_id + "-" + runInformation.heat_number, mph);
 
     // Save the current mph and location info and advance the index
     stInfo[stInfoCurrentIndex].latitude = latitude;
@@ -374,7 +410,7 @@ void processRunState()
 
   
 
-  drawMainScreen(runInformation.device_id, mph);
+  drawMainScreen(runInformation.device_id + "-" + runInformation.heat_number, mph);
 
   // Update the max speed if needed
   if (mph > runInformation.high_speed) {
@@ -468,16 +504,21 @@ bool loadRunConfig() {
    
     // Store key-value pair in global variables
     if (key == "device_id") {
-      // Get MAC address
-      uint8_t baseMac[6];
-      // Get base MAC address
-      esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+      if (value.isEmpty()) {
+          
+        // Get MAC address
+        uint8_t baseMac[6];
+        // Get base MAC address
+        esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
 
-      // Convert MAC address to string
-      char macStr[13] = { 0 };
-      sprintf(macStr, "%2X%2X%2X%2X%2X%2X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+        // Convert MAC address to string
+        char macStr[13] = { 0 };
+        sprintf(macStr, "%2X%2X%2X%2X%2X%2X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
 
-      runInformation.device_id = macStr;
+        runInformation.device_id = macStr;
+      } else {
+        runInformation.device_id = value;
+      }
     } else if (key == "finishLine_left_lat") {
       runInformation.finishLine_left.latitude = value.toDouble();
     } else if (key == "finishLine_left_lng") {
@@ -488,12 +529,10 @@ bool loadRunConfig() {
       runInformation.finishLine_right.longitude = value.toDouble();
     } else if (key == "bamf_speed") {
       runInformation.bamf_speed = value.toDouble();
-    } else if (key == "UploadServerIP") {
-      runInformation.UploadServerIP = value;
-    } else if (key == "UploadSSID") {
-      runInformation.UploadSSID = value;
-    } else if (key == "UploadPassword") {
-      runInformation.UploadPassword = value;
+    } else if (key == "upload_server_ip") {
+      runInformation.upload_server_ip = value;
+    } else if (key == "heat_number") {
+      runInformation.heat_number = value.toInt();
     } else {
       // Unknown key
     }
@@ -698,16 +737,23 @@ void setup()
   }
 
   if (myGNSS.getFixType() != 3) {
-    drawGPSLockScreen(runInformation.device_id);
+    drawGPSLockScreen(runInformation.device_id + "-" + runInformation.heat_number);
   }
 
-  drawReadyScreen(runInformation.device_id);
+  drawReadyScreen(runInformation.device_id + "-" + runInformation.heat_number);
 
 }
+
+bool uploadRunResultsAndData() {
+
+  return true;
+}
+
 // Declaration of your functions
 void bamf_speed(String parameter) {
     Serial.printf("Running bamf_speed(%s) function", parameter.c_str());
     runInformation.bamf_speed = parameter.toDouble();
+    redrawCurrentScreen(runInformation.device_id, 0.00, runInformation.high_speed);
 }
 
 void start_run(String parameter) {
@@ -717,7 +763,7 @@ void start_run(String parameter) {
     // Reset globals      
     speed_tracking_active = false;
     lastMillis = 0;
-    ledEnableBlue();
+    ledEnableGreen();
 
     if (!runInformation.bamf_speed) {
       drawSummaryScreen(runInformation.high_speed);
@@ -726,7 +772,7 @@ void start_run(String parameter) {
     }
     
     saveSpeedTrackerInfoToSD();
-    drawReadyScreen(runInformation.device_id);
+    drawReadyScreen(runInformation.device_id + "-" + runInformation.heat_number);
     runInformation.high_speed = 0;
 
   } else {
@@ -762,8 +808,21 @@ void run_diagnostics(String parameter) {
     // Your function's code here
 }
 
+void heat_number(String parameter) {
+    Serial.println("Running heat_number function");
+    runInformation.heat_number = parameter.toInt();
+    // Your function's code here
+}
+
 void force_upload(String parameter) {
     Serial.println("Running force_upload function");
+    uploadRunResultsAndData();
+    // Your function's code here
+}
+
+void upload_server_ip(String parameter) {
+    Serial.println("Running upload_server_ip function");
+    runInformation.upload_server_ip = parameter;
     // Your function's code here
 }
 
@@ -806,6 +865,12 @@ void checkAndExecuteCommand(String command) {
     }
     else if(functionName == "force_upload") {
         force_upload(parameter);
+    } 
+    else if(functionName == "heat_number") {
+        heat_number(parameter);
+    }
+    else if(functionName == "upload_server_ip") {
+        upload_server_ip(parameter);
     }
 
 }
@@ -825,11 +890,12 @@ void loop()
       processRunState();
       //Serial.printf("Fix Type %d\n", myGNSS.getFixType());
     } else {
-      drawGPSLockScreen(runInformation.device_id);
+      drawGPSLockScreen(runInformation.device_id + "-" + runInformation.heat_number);
     }
   }
 
   String cmdString = readCardData(300);
+
   if (!cmdString.isEmpty()) {
     checkAndExecuteCommand(cmdString);
   }
