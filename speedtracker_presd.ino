@@ -6,17 +6,18 @@
 #include <SparkFun_u-blox_GNSS_Arduino_Library.h>
 #include <u-blox_config_keys.h>
 #include <u-blox_structs.h>
-#include <esp_wifi.h>
-#include <esp_http_client.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
 
-// Touch Sensor definitions
-#define BUTTON_INPUT_PIN              32
-
-// Status LED definitions
-#define LED_BLUE_OUTPUT_PIN           14
-#define LED_RED_OUTPUT_PIN            25
-#define LED_GREEN_OUTPUT_PIN          27
-#define LED_VCC_PIN                   26 
+// // Status LED definitions
+// const int LED_RED_OUTPUT_PIN = 32;
+// const int LED_GREEN_OUTPUT_PIN = 25;
+// const int LED_BLUE_OUTPUT_PIN = 26;
+// const int LED_VCC_PIN = 33;
+const int LED_RED_OUTPUT_PIN = 25;
+const int LED_GREEN_OUTPUT_PIN = 27;
+const int LED_BLUE_OUTPUT_PIN = 14;
+const int LED_VCC_PIN = 26;
 
 // BAMF special values
 #define BAMF_X_POSITION               120
@@ -27,13 +28,18 @@
 #define RUN_CONFIG_TEMP_FILE_PATH     "/tmp_run_config.txt"
 #define RUN_DATA_FILE_PATH            "/run_data.txt"
 
+#define RUN_DATA_UPLOAD_PATH          "/upload_run_data"
+#define RUN_RESULT_UPLOAD_PATH        "/upload_run_result"
+
 // BAMF special values
 #define BAMF_X_POSITION               120
 #define BAMF_Y_POSITION               6
 #define BAMF_CHAR                     "B"
 
+
 // Enum type to represent each of the screens
 enum Screen {
+    ATTENTION_SCREEN,
     GPS_LOCK_SCREEN,
     READY_SCREEN,
     MAIN_SCREEN,
@@ -45,8 +51,11 @@ enum Screen {
 Screen currentScreen;
 
 // Function to redraw the current screen
-void redrawCurrentScreen(String device_id, double speed, double topSpeed) {
+void redrawCurrentScreen(String attention_string, String device_id, double speed, double topSpeed) {
     switch (currentScreen) {
+        case ATTENTION_SCREEN:
+            drawAttentionScreen(attention_string);
+            break;
         case GPS_LOCK_SCREEN:
             drawGPSLockScreen(device_id);
             break;
@@ -82,8 +91,10 @@ typedef struct _RUN_INFORMATION {
   GpsCoordinate finishLine_right;
   double high_speed;
   double bamf_speed;
-  uint8_t heat_number;
+  String heat_number;
   String upload_server_ip;
+  String upload_server_ssid;
+  String upload_server_password;
 } RUN_INFORMATION;
 
 RUN_INFORMATION runInformation;
@@ -101,7 +112,7 @@ typedef struct _SPEEDTRACKER_INFO {
 //
 // Maximum number of SPEEDTRACKER_INFO objects in the SPEEDTRACKER_INFO array.
 //
-#define SPEEDTRACKER_INFO_MAX_ENTRIES   2000
+#define SPEEDTRACKER_INFO_MAX_ENTRIES   1000
 
 //
 // The array of SPEEDTRACKER_INFO objects used to track the speed/location info for a race
@@ -112,6 +123,10 @@ SPEEDTRACKER_INFO stInfo[SPEEDTRACKER_INFO_MAX_ENTRIES]; // Array of the speedtr
 // Index of the current entry in the SPEEDTRACKER_INFO object array
 //
 uint stInfoCurrentIndex = 0; // Current index of the speedtracker array
+
+String getDeviceFullName() {
+  return runInformation.device_id + "-" + runInformation.heat_number;
+}
 
 void ledEnableRed() {
   ledDisable(LED_GREEN_OUTPUT_PIN);
@@ -167,20 +182,8 @@ const unsigned long debounceDelay = 150; // Debounce delay in milliseconds
 volatile unsigned long lastDebounceTime = 0; // Stores the last time the button was pressed
 
 //
-// ISRs
-//
-void IRAM_ATTR buttonInterrupt() {
-  // Check if the debounce delay has passed since the last button press
-  if ((millis() - lastDebounceTime) > debounceDelay) {
-    touchDetected = true;
-    lastDebounceTime = millis(); // Update the last debounce time
-  }
-}
-
-//
 // GPS helper routines
 //
-
 
 double convertToDegrees(int32_t coordinate) {
   double degrees = coordinate / 10000000.0;
@@ -228,25 +231,24 @@ bool crossFinishLine(struct GpsCoordinate finishLineLeft, struct GpsCoordinate f
 
 void drawAttentionScreen(String attentionString) {
 
-  // Clear the display
-  u8g2.clearBuffer();
+  u8g2.clearBuffer(); // clear the buffer
+ 
+  u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
 
-  // Set text size and position
-  u8g2.setFont(u8g2_font_ncenB12_tf);
-  u8g2.drawStr(10, 10, attentionString.c_str());
+  u8g2.drawStr(0, 55, attentionString.c_str());
 
   // Check bamf status
   if (runInformation.bamf_speed > 0) {
     u8g2.drawStr(BAMF_X_POSITION, BAMF_Y_POSITION, BAMF_CHAR);
   }
 
-  // Clear the display
   u8g2.sendBuffer();
 }
 
+
+
 void drawGPSLockScreen(String device_id) {
-  currentScreen = GPS_LOCK_SCREEN;
-  
+
   ledEnableRed();
 
   u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
@@ -262,7 +264,7 @@ void drawGPSLockScreen(String device_id) {
   int16_t x = u8g2.getDisplayWidth();
   char* message = "Acquiring GPS ...";
 
-  while (myGNSS.getFixType() != 3) {
+  while (!myGNSS.getGnssFixOk() && myGNSS.getSIV() < 4) {
     u8g2.clearBuffer(); // clear the buffer
     u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
     u8g2.drawStr(0, 20, device_id.c_str()); // draw device id
@@ -380,17 +382,19 @@ void processRunState()
   double latitude = getLatitudeDegrees();
   double longitude = getLongitudeDegrees();
 
-  if (((millis() - lastMillis) > 1000) ||
+  if (mph > 300) {
+    mph = 0;
+  }
+
+  if (mph < 2.00) {
+    drawMainScreen(getDeviceFullName(), 0.00);
+  } else {
+    drawMainScreen(getDeviceFullName(), mph);
+  }
+
+  if (((millis() - lastMillis) > 500) ||
       (lastMillis <= 0)) {
     lastMillis = millis();
-
-    if (mph < 2.00) {
-      drawMainScreen(runInformation.device_id + "-" + runInformation.heat_number, 0.00);
-    } else {
-      drawMainScreen(runInformation.device_id + "-" + runInformation.heat_number, mph);
-    }
-
-    drawMainScreen(runInformation.device_id + "-" + runInformation.heat_number, mph);
 
     // Save the current mph and location info and advance the index
     stInfo[stInfoCurrentIndex].latitude = latitude;
@@ -408,9 +412,11 @@ void processRunState()
     }
   }
 
-  
-
-  drawMainScreen(runInformation.device_id + "-" + runInformation.heat_number, mph);
+  if (mph < 2.00) {
+    drawMainScreen(getDeviceFullName(), 0.00);
+  } else {
+    drawMainScreen(getDeviceFullName(), mph);
+  }
 
   // Update the max speed if needed
   if (mph > runInformation.high_speed) {
@@ -437,14 +443,11 @@ void saveSpeedTrackerInfoToSD() {
     Serial.println();
   }
 
-  // Write out the high speed
-  file.printf("High Speed: %06.2f\n", runInformation.high_speed);
-
   // Add stInfo array data to the JSON array
   for (int i = 0; i < SPEEDTRACKER_INFO_MAX_ENTRIES; i++) {
     if (stInfo[i].latitude) {
-      file.printf("%10.7f,%10.7f,%10.7f\n", stInfo[i].latitude, stInfo[i].longitude, stInfo[i].mph);
-      Serial.printf("%10.7f,%10.7f,%10.7f\n", stInfo[i].latitude, stInfo[i].longitude, stInfo[i].mph);
+      file.printf("%s,%10.7f,%10.7f,%10.7f\n", getDeviceFullName().c_str(), stInfo[i].latitude, stInfo[i].longitude, stInfo[i].mph);
+      Serial.printf("%s,%10.7f,%10.7f,%10.7f\n", getDeviceFullName().c_str(), stInfo[i].latitude, stInfo[i].longitude, stInfo[i].mph);
     }
   }
 
@@ -529,10 +532,14 @@ bool loadRunConfig() {
       runInformation.finishLine_right.longitude = value.toDouble();
     } else if (key == "bamf_speed") {
       runInformation.bamf_speed = value.toDouble();
+    } else if (key == "heat_number") {
+      runInformation.heat_number = value;
     } else if (key == "upload_server_ip") {
       runInformation.upload_server_ip = value;
-    } else if (key == "heat_number") {
-      runInformation.heat_number = value.toInt();
+    } else if (key == "upload_server_password") {
+      runInformation.upload_server_password = value;
+    } else if (key == "upload_server_ssid") {
+      runInformation.upload_server_ssid = value;
     } else {
       // Unknown key
     }
@@ -543,39 +550,6 @@ bool loadRunConfig() {
 
   return true;
 }
-
-/*String readCardData(uint16_t timeout) {
-  uint8_t success;
-  uint8_t uid[] = {0, 0, 0, 0, 0, 0, 0};
-  uint8_t uidLength;
-  String cardData;
-
-  success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength, timeout);
-
-  if (success) {
-    uint8_t pageBuffer[4];
-
-    // Read 4 bytes (1 page) at a time
-    for (uint8_t page = 4; page < 129; page++) {
-
-      if (nfc.ntag2xx_ReadPage(page, pageBuffer)) {
-        for (uint8_t i = 0; i < 4; i++) {
-          if ((pageBuffer[i] > 31) && (pageBuffer[i] < 127)) {
-            if (pageBuffer[i] != 13) {
-              cardData += (char)pageBuffer[i];
-            }
-          Serial.printf("Data: %s\n", cardData.c_str());          }
-        }
-      } else {
-        //Serial.println("Failed to read page data");
-        //Serial.printf("readCardData() returning %s\n", cardData.c_str());
-        return cardData;
-      }
-    }
-  }
-  //Serial.printf("readCardData() returning %s\n", cardData.c_str());
-  return cardData;
-}*/
 
 String parseCardData(String rawConfig) {
   int start = 0, end = 0;
@@ -668,7 +642,7 @@ void setup()
   }
 
   myGNSS.setI2COutput(COM_TYPE_UBX); //Set the I2C port to output UBX only (turn off NMEA noise)
-  myGNSS.setNavigationFrequency(10); //Produce two solutions per second
+  myGNSS.setNavigationFrequency(2); //Produce two solutions per second
   myGNSS.setAutoPVT(true); //Tell the GNSS to "send" each solution
 
 
@@ -722,43 +696,142 @@ void setup()
   //
   nfc.SAMConfig();
 
-  //
-  // Set the touchPin as an INPUT
-  //
-  pinMode(BUTTON_INPUT_PIN, INPUT_PULLDOWN);
-
-  //
-  // Attach the interrupt to the touchPin to trigger the interrupt when the pin goes from LOW to HIGH
-  //
-  attachInterrupt(digitalPinToInterrupt(BUTTON_INPUT_PIN), buttonInterrupt, FALLING);
-
   if (!loadRunConfig()) {
     u8g2.drawStr(10, 10, "No run info on SD card");
   }
 
-  if (myGNSS.getFixType() != 3) {
-    drawGPSLockScreen(runInformation.device_id + "-" + runInformation.heat_number);
+  //
+  // Test GPS connection
+  //
+
+  if (!myGNSS.getGnssFixOk() && myGNSS.getSIV() < 4) {
+    ledEnable(LED_RED_OUTPUT_PIN);
+    drawGPSLockScreen(getDeviceFullName());
   }
 
-  drawReadyScreen(runInformation.device_id + "-" + runInformation.heat_number);
+  ledEnable(LED_GREEN_OUTPUT_PIN); 
+  drawReadyScreen(getDeviceFullName());
+}
 
+#define HISTORY_SIZE 20
+
+int history[HISTORY_SIZE];
+int historyIndex = 0;
+
+void addValueToPositionHistory(int value) {
+  history[historyIndex] = value;
+  historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+}
+
+bool checkValueInPositionHistory(int valueToCheck) {
+  for (int i = 0; i < HISTORY_SIZE; i++) {
+    if (history[i] == valueToCheck) {
+      return true;
+    }
+  }
+  return false;
+}
+
+
+String getRunData() {
+  // Open the file
+  File file = SD.open(RUN_DATA_FILE_PATH);  // Replace with your file path
+  String fileData;
+
+  if (file) {
+    // Read and print each line of the file
+    while (file.available()) {
+      fileData += file.readStringUntil('\n') + '\n';
+    }
+
+    // Close the file
+    file.close();
+  }
+  return fileData;
 }
 
 bool uploadRunResultsAndData() {
+  int httpResponseCode = 0;
 
-  return true;
+  Serial.printf("SSID:%s PW:%s\n", runInformation.upload_server_ssid.c_str(), runInformation.upload_server_password.c_str());
+  drawAttentionScreen("Uploading run data...");
+  WiFi.begin(runInformation.upload_server_ssid, runInformation.upload_server_password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  // Check WiFi connection status
+  if(WiFi.status() == WL_CONNECTED){   
+    HTTPClient http;
+    
+    // Specify destination for HTTP request
+    http.begin(runInformation.upload_server_ip + RUN_RESULT_UPLOAD_PATH);
+
+    // Specify content-type header as text/plain
+    http.addHeader("Content-Type", "text/plain");
+    
+    // Send HTTP POST request
+    httpResponseCode = http.POST(getDeviceFullName() + ", " + runInformation.high_speed);
+
+    // Free resources
+    http.end();
+  }
+
+  // Check WiFi connection status
+  if(WiFi.status() == WL_CONNECTED){   
+    HTTPClient http;
+    
+    // Specify destination for HTTP request
+    http.begin(runInformation.upload_server_ip + RUN_DATA_UPLOAD_PATH);
+
+    // Specify content-type header as text/plain
+    http.addHeader("Content-Type", "text/plain");
+    
+    // Send HTTP POST request
+    httpResponseCode = http.POST(getRunData());
+
+   
+    if (httpResponseCode == 200) {
+      drawAttentionScreen("Run data uploaded...");
+      Serial.println("Run data uploaded..");
+    } else {
+      Serial.printf("Error %d uploading data\n", httpResponseCode);
+      drawAttentionScreen("Error uploading data\n");
+    }
+    
+    // Free resources
+    http.end();
+  }
+
+  redrawCurrentScreen("", getDeviceFullName(), 0.00, runInformation.high_speed);
+  return (httpResponseCode == 200);
 }
 
-// Declaration of your functions
+void device_id(String parameter) {
+    Serial.printf("Running device_id(%s) function", parameter.c_str());
+    runInformation.device_id = parameter;
+    redrawCurrentScreen("", getDeviceFullName(), 0.00, runInformation.high_speed);
+}
+
 void bamf_speed(String parameter) {
     Serial.printf("Running bamf_speed(%s) function", parameter.c_str());
     runInformation.bamf_speed = parameter.toDouble();
-    redrawCurrentScreen(runInformation.device_id, 0.00, runInformation.high_speed);
+    redrawCurrentScreen("",getDeviceFullName() , 0.00, runInformation.high_speed);
 }
 
 void start_run(String parameter) {
   Serial.println("Running start_run function");
 
+  if (speed_tracking_active != true) {
+    runInformation.high_speed = 0;
+    speed_tracking_active = true;    
+    ledEnableBlue();      
+  }
+}
+
+void end_run(String parameter) {
+  Serial.println("Running start_run function");
   if (speed_tracking_active != false) {
     // Reset globals      
     speed_tracking_active = false;
@@ -772,20 +845,11 @@ void start_run(String parameter) {
     }
     
     saveSpeedTrackerInfoToSD();
-    drawReadyScreen(runInformation.device_id + "-" + runInformation.heat_number);
-    runInformation.high_speed = 0;
 
-  } else {
-    speed_tracking_active = true;    
-    ledEnableBlue();      
-  }
-}
+    uploadRunResultsAndData();
 
-void end_run(String parameter) {
-  Serial.println("Running start_run function");
-  if (speed_tracking_active) {
-    start_run("");
-  }
+    drawReadyScreen(getDeviceFullName());
+  } 
 }
 
 void show_high(String parameter) {
@@ -811,6 +875,7 @@ void run_diagnostics(String parameter) {
 void heat_number(String parameter) {
     Serial.println("Running heat_number function");
     runInformation.heat_number = parameter.toInt();
+    redrawCurrentScreen("", getDeviceFullName() , 0, runInformation.high_speed);
     // Your function's code here
 }
 
@@ -823,6 +888,8 @@ void force_upload(String parameter) {
 void upload_server_ip(String parameter) {
     Serial.println("Running upload_server_ip function");
     runInformation.upload_server_ip = parameter;
+    drawAttentionScreen("Updated server upload IP to " + parameter);
+    redrawCurrentScreen("", getDeviceFullName(), 0.00, runInformation.high_speed);
     // Your function's code here
 }
 
@@ -847,6 +914,9 @@ void checkAndExecuteCommand(String command) {
     if(functionName == "bamf_speed") {
         bamf_speed(parameter);
     }
+    else if(functionName == "device_id") {
+        device_id(parameter);
+    }
     else if(functionName == "start_run") {
         start_run(parameter);
     }
@@ -855,7 +925,7 @@ void checkAndExecuteCommand(String command) {
     }
     else if(functionName == "show_high") {
         show_high(parameter);
-        drawReadyScreen(runInformation.device_id);
+        drawReadyScreen(getDeviceFullName());
     }
     else if(functionName == "reset_sd") {
         reset_sd(parameter);
@@ -875,7 +945,6 @@ void checkAndExecuteCommand(String command) {
 
 }
 
-
 void loop()
 {
     // Check if the touch sensor was pressed
@@ -885,20 +954,18 @@ void loop()
   }
 
   if (speed_tracking_active) {
-    if (myGNSS.getFixType() == 3) 
+    if (myGNSS.getFixType() >= 3) 
     {
       processRunState();
       //Serial.printf("Fix Type %d\n", myGNSS.getFixType());
     } else {
-      drawGPSLockScreen(runInformation.device_id + "-" + runInformation.heat_number);
+      drawGPSLockScreen(getDeviceFullName());
     }
   }
 
-  String cmdString = readCardData(300);
+  String cmdString = readCardData(50);
 
   if (!cmdString.isEmpty()) {
     checkAndExecuteCommand(cmdString);
   }
-
-  delay(50);
 }
