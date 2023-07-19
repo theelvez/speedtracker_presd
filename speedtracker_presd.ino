@@ -112,7 +112,7 @@ typedef struct _SPEEDTRACKER_INFO {
 //
 // Maximum number of SPEEDTRACKER_INFO objects in the SPEEDTRACKER_INFO array.
 //
-#define SPEEDTRACKER_INFO_MAX_ENTRIES   1000
+#define SPEEDTRACKER_INFO_MAX_ENTRIES   2000
 
 //
 // The array of SPEEDTRACKER_INFO objects used to track the speed/location info for a race
@@ -206,12 +206,6 @@ double getLongitudeDegrees() {
 double getLatitudeDegrees() {
   return convertToDegrees(myGNSS.getLatitude());
 }
-
-
-GpsCoordinate finishLineLeft = {47.54406, -122.04987};
-GpsCoordinate finishLineRight = {47.54439, -122.04957};
-GpsCoordinate vehiclePreviousPosition = {0, 0};
-GpsCoordinate vehicleCurrentPosition = {0, 0};
 
 
 // Use your new struct in the function
@@ -852,6 +846,16 @@ void end_run(String parameter) {
   } 
 }
 
+void abort_run(String parameter) {
+  Serial.println("Running abort_run function");
+
+  if (speed_tracking_active) {
+    runInformation.high_speed = 0;
+    speed_tracking_active = false;    
+    ledDisableAll();      
+  }
+}
+
 void show_high(String parameter) {
     Serial.println("Running show_high function");
     
@@ -925,6 +929,11 @@ void checkAndExecuteCommand(String command) {
     }
     else if(functionName == "show_high") {
         show_high(parameter);
+        drawReadyScreen(getDeviceFullName());
+    }
+    else if(functionName == "abort_run") {
+        abort_run(parameter);
+        ledEnableGreen();
         drawReadyScreen(getDeviceFullName());
     }
     else if(functionName == "reset_sd") {
