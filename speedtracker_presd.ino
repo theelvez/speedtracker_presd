@@ -14,6 +14,8 @@
 // const int LED_GREEN_OUTPUT_PIN = 25;
 // const int LED_BLUE_OUTPUT_PIN = 26;
 // const int LED_VCC_PIN = 33;
+
+// Kevin special device LED pin mappings
 const int LED_RED_OUTPUT_PIN = 25;
 const int LED_GREEN_OUTPUT_PIN = 27;
 const int LED_BLUE_OUTPUT_PIN = 14;
@@ -208,13 +210,14 @@ double getLatitudeDegrees() {
 }
 
 
-// Use your new struct in the function
+//
+// Detect finish line crossing by linear bisection method (draw a line from left to right finish line and see if the line from previous to current position intersects with it)
+//
 bool crossFinishLine(struct GpsCoordinate finishLineLeft, struct GpsCoordinate finishLineRight, struct GpsCoordinate vehiclePreviousPosition, struct GpsCoordinate vehicleCurrentPosition) {
   double denominator = ((finishLineRight.latitude - finishLineLeft.latitude) * (vehicleCurrentPosition.longitude - vehiclePreviousPosition.longitude) - (finishLineRight.longitude - finishLineLeft.longitude) * (vehicleCurrentPosition.latitude - vehiclePreviousPosition.latitude));
   double numerator1 = ((finishLineRight.longitude - finishLineLeft.longitude) * (vehiclePreviousPosition.latitude - finishLineLeft.latitude) - (finishLineRight.latitude - finishLineLeft.latitude) * (vehiclePreviousPosition.longitude - finishLineLeft.longitude));
   double numerator2 = ((vehicleCurrentPosition.longitude - vehiclePreviousPosition.longitude) * (vehiclePreviousPosition.latitude - finishLineLeft.latitude) - (vehicleCurrentPosition.latitude - vehiclePreviousPosition.latitude) * (vehiclePreviousPosition.longitude - finishLineLeft.longitude));
 
-  // Detect coincident lines (has a problem, read below)
   if (denominator == 0) return numerator1 == 0 && numerator2 == 0;
 
   double r = numerator1 / denominator;
