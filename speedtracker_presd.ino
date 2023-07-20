@@ -129,7 +129,7 @@ uint stInfoCurrentIndex = 0; // Current index of the speedtracker array
 SFE_UBLOX_GNSS myGNSS;
 
 String getDeviceFullName() {
-  return runInformation.device_id + '-'+ myGNSS.getSIV();
+  return runInformation.device_id + '-' + myGNSS.getSIV();
 }
 
 void ledEnableRed() {
@@ -261,7 +261,7 @@ void drawGPSLockScreen(String device_id) {
   int16_t x = u8g2.getDisplayWidth();
   char* message = "Acquiring GPS ...";
 
-  while (!myGNSS.getGnssFixOk() || myGNSS.getSIV() < 4) {
+  while (!myGNSS.getGnssFixOk() || (myGNSS.getSIV() < 4) || (myGNSS.getFixType() < 3)) {
     u8g2.clearBuffer(); // clear the buffer
     u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
     u8g2.drawStr(0, 20, device_id.c_str()); // draw device id
@@ -722,12 +722,9 @@ void setup()
   //
   // Test GPS connection
   //
-
-  if (!myGNSS.getGnssFixOk() || myGNSS.getSIV() < 4) {
-    ledEnable(LED_RED_OUTPUT_PIN);
-    drawGPSLockScreen(getDeviceFullName());
-  }
-
+ 
+  drawGPSLockScreen(getDeviceFullName());
+  
   ledEnable(LED_GREEN_OUTPUT_PIN); 
   drawReadyScreen(getDeviceFullName());
 
