@@ -93,7 +93,6 @@ typedef struct _RUN_INFORMATION {
   GpsCoordinate finishLine_right;
   double high_speed;
   double bamf_speed;
-  String heat_number;
   String upload_server_ip;
   String upload_server_ssid;
   String upload_server_password;
@@ -127,7 +126,7 @@ SPEEDTRACKER_INFO stInfo[SPEEDTRACKER_INFO_MAX_ENTRIES]; // Array of the speedtr
 uint stInfoCurrentIndex = 0; // Current index of the speedtracker array
 
 String getDeviceFullName() {
-  return runInformation.device_id + "-" + runInformation.heat_number;
+  return runInformation.device_id;
 }
 
 void ledEnableRed() {
@@ -529,8 +528,6 @@ bool loadRunConfig() {
       runInformation.finishLine_right.longitude = value.toDouble();
     } else if (key == "bamf_speed") {
       runInformation.bamf_speed = value.toDouble();
-    } else if (key == "heat_number") {
-      runInformation.heat_number = value;
     } else if (key == "upload_server_ip") {
       runInformation.upload_server_ip = value;
     } else if (key == "upload_server_password") {
@@ -879,13 +876,6 @@ void run_diagnostics(String parameter) {
     // Your function's code here
 }
 
-void heat_number(String parameter) {
-    Serial.println("Running heat_number function");
-    runInformation.heat_number = parameter.toInt();
-    redrawCurrentScreen("", getDeviceFullName() , 0, runInformation.high_speed);
-    // Your function's code here
-}
-
 void force_upload(String parameter) {
     Serial.println("Running force_upload function");
     uploadRunResultsAndData();
@@ -948,9 +938,6 @@ void checkAndExecuteCommand(String command) {
     else if(functionName == "force_upload") {
         force_upload(parameter);
     } 
-    else if(functionName == "heat_number") {
-        heat_number(parameter);
-    }
     else if(functionName == "upload_server_ip") {
         upload_server_ip(parameter);
     }
