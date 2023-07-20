@@ -125,8 +125,10 @@ SPEEDTRACKER_INFO stInfo[SPEEDTRACKER_INFO_MAX_ENTRIES]; // Array of the speedtr
 //
 uint stInfoCurrentIndex = 0; // Current index of the speedtracker array
 
+SFE_UBLOX_GNSS myGNSS;
+
 String getDeviceFullName() {
-  return runInformation.device_id;
+  return runInformation.device_id + '-'+ myGNSS.getSIV();
 }
 
 void ledEnableRed() {
@@ -160,8 +162,6 @@ void ledEnable(uint8_t ledNumber) {
 void ledDisable(uint8_t ledNumber) {
   digitalWrite(ledNumber, HIGH);
 }
-
-SFE_UBLOX_GNSS myGNSS;
 
 //
 // PN532 Globals
@@ -260,7 +260,7 @@ void drawGPSLockScreen(String device_id) {
   int16_t x = u8g2.getDisplayWidth();
   char* message = "Acquiring GPS ...";
 
-  while (!myGNSS.getGnssFixOk() && myGNSS.getSIV() < 4) {
+  while (!myGNSS.getGnssFixOk() || myGNSS.getSIV() < 4) {
     u8g2.clearBuffer(); // clear the buffer
     u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
     u8g2.drawStr(0, 20, device_id.c_str()); // draw device id
@@ -382,7 +382,7 @@ void processRunState()
     mph = 0;
   }
 
-  if (mph < 2.00) {
+  if (mph < 6.00) {
     drawMainScreen(getDeviceFullName(), 0.00);
   } else {
     drawMainScreen(getDeviceFullName(), mph);
@@ -408,7 +408,7 @@ void processRunState()
     }
   }
 
-  if (mph < 2.00) {
+  if (mph < 6.00) {
     drawMainScreen(getDeviceFullName(), 0.00);
   } else {
     drawMainScreen(getDeviceFullName(), mph);
@@ -698,7 +698,7 @@ void setup()
   // Test GPS connection
   //
 
-  if (!myGNSS.getGnssFixOk() && myGNSS.getSIV() < 4) {
+  if (!myGNSS.getGnssFixOk() || myGNSS.getSIV() < 4) {
     ledEnable(LED_RED_OUTPUT_PIN);
     drawGPSLockScreen(getDeviceFullName());
   }
@@ -825,7 +825,7 @@ void start_run(String parameter) {
 }
 
 void end_run(String parameter) {
-  Serial.println("Running start_run function");
+  Serial.println("Running end_run function");
   if (speed_tracking_active != false) {
     // Reset globals      
     speed_tracking_active = false;
