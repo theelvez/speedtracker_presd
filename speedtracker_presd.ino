@@ -767,54 +767,81 @@ bool uploadRunResultsAndData() {
   int httpResponseCode = 0;
 
   Serial.printf("SSID:%s PW:%s\n", runInformation.upload_server_ssid.c_str(), runInformation.upload_server_password.c_str());
-  drawAttentionScreen("Uploading run...");
+  drawAttentionScreen("WiFi...");
   WiFi.begin(runInformation.upload_server_ssid, runInformation.upload_server_password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  // Check WiFi connection status
-  if(WiFi.status() == WL_CONNECTED){   
-    HTTPClient http;
-    
-    // Specify destination for HTTP request
-    http.begin(runInformation.upload_server_ip + RUN_RESULT_UPLOAD_PATH);
 
-    // Specify content-type header as text/plain
-    http.addHeader("Content-Type", "text/plain");
-    
-    // Send HTTP POST request
-    httpResponseCode = http.POST(runInformation.device_id + ", " + runInformation.high_speed);
+  bool successfulUpload = false;
+  int attemptCount = 0;
+  
 
-    // Free resources
-    http.end();
+  while (!successfulUpload)
+  {
+    attemptCount++;
+    drawAttentionScreen("Results " + attemptCount + "(" + WiFi.status() + "," + httpResponseCode + ")");
+    delay(1000);
+
+    // Check WiFi connection status
+    if(WiFi.status() == WL_CONNECTED){   
+      HTTPClient http;
+      
+      // Specify destination for HTTP request
+      http.begin(runInformation.upload_server_ip + RUN_RESULT_UPLOAD_PATH);
+
+      // Specify content-type header as text/plain
+      http.addHeader("Content-Type", "text/plain");
+      
+      // Send HTTP POST request
+      httpResponseCode = http.POST(runInformation.device_id + ", " + runInformation.high_speed);
+      if (httpResponseCode >= 200 && httpResponseCode <= 299)
+      {
+        successfulUpload = true;
+      }
+
+      // Free resources
+      http.end();
+    }
   }
 
-  // Check WiFi connection status
-  if(WiFi.status() == WL_CONNECTED){   
-    HTTPClient http;
-    
-    // Specify destination for HTTP request
-    http.begin(runInformation.upload_server_ip + RUN_DATA_UPLOAD_PATH);
+  successfulUpload = false;
+  attemptCount = 0;
 
-    // Specify content-type header as text/plain
-    http.addHeader("Content-Type", "text/plain");
-    
-    // Send HTTP POST request
-    httpResponseCode = http.POST(getRunData());
+  while (!successfulUpload)
+  {
+    attemptCount++;
+    drawAttentionScreen("Data " + attemptCount + "(" + WiFi.status() + "," + httpResponseCode + ")");
+    delay(1000);
 
-   
-    if (httpResponseCode == 200) {
-      drawAttentionScreen("Data uploaded...");
-      Serial.println("Data uploaded..");
-    } else {
-      Serial.printf("Error %d uploading data\n", httpResponseCode);
-      drawAttentionScreen("Error uploading\n");
+    // Check WiFi connection status
+    if(WiFi.status() == WL_CONNECTED){   
+      HTTPClient http;
+      
+      // Specify destination for HTTP request
+      http.begin(runInformation.upload_server_ip + RUN_DATA_UPLOAD_PATH);
+
+      // Specify content-type header as text/plain
+      http.addHeader("Content-Type", "text/plain");
+      
+      // Send HTTP POST request
+      httpResponseCode = http.POST(getRunData());
+
+    
+      if (httpResponseCode >= 200 && httpResponseCode <= 299) {
+        drawAttentionScreen("Run Data uploaded...");
+        Serial.println("Data uploaded..");
+        successfulUpload = true;
+      } else {
+        Serial.printf("Error %d uploading data\n", httpResponseCode);
+        drawAttentionScreen("Error uploading" + httpResponseCode + "\n");
+      }
+      
+      // Free resources
+      http.end();
     }
-    
-    // Free resources
-    http.end();
   }
 
   redrawCurrentScreen("", getDeviceFullName(), 0.00, runInformation.high_speed);
