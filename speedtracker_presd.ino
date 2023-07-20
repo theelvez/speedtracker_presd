@@ -778,14 +778,11 @@ bool uploadRunResultsAndData() {
   bool successfulUpload = false;
   int attemptCount = 0;
   
-  char message[128];
-
 
   while (!successfulUpload)
   {
     attemptCount++;
-    sprintf(message, "Results %d %d %d", attemptCount, WiFi.status(), httpResponseCode);
-    drawAttentionScreen(message);
+    drawAttentionScreen("Results " + attemptCount + "(" + WiFi.status() + "," + httpResponseCode + ")");
     delay(1000);
 
     // Check WiFi connection status
@@ -816,8 +813,7 @@ bool uploadRunResultsAndData() {
   while (!successfulUpload)
   {
     attemptCount++;
-    sprintf(message, "Data %d %d %d", attemptCount, WiFi.status(), httpResponseCode);
-    drawAttentionScreen(message);
+    drawAttentionScreen("Data " + attemptCount + "(" + WiFi.status() + "," + httpResponseCode + ")");
     delay(1000);
 
     // Check WiFi connection status
@@ -840,7 +836,7 @@ bool uploadRunResultsAndData() {
         successfulUpload = true;
       } else {
         Serial.printf("Error %d uploading data\n", httpResponseCode);
-        drawAttentionScreen("ErrUp: " + httpResponseCode);
+        drawAttentionScreen("Error uploading" + httpResponseCode + "\n");
       }
       
       // Free resources
