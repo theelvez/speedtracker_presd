@@ -232,13 +232,13 @@ void drawAttentionScreen(String attentionString) {
  
   u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
 
-  char speedStr[11];
+  char speedStr[20];
   
  
   if (!runInformation.bamf_speed) {
-      sprintf(speedStr, "%06.2f mph", runInformation.high_speed); // add leading zeros if needed
+      sprintf(speedStr, "%s - %06.2f mph", runInformation.device_id, runInformation.high_speed); // add leading zeros if needed
     } else {
-      sprintf(speedStr, "%06.2f mph", runInformation.bamf_speed); // add leading zeros if needed
+      sprintf(speedStr, "%s - %06.2f mph", runInformation.device_id, runInformation.bamf_speed); // add leading zeros if needed
     } 
 
   u8g2.drawStr(0, 20, speedStr);
@@ -289,7 +289,11 @@ void drawGPSLockScreen(String device_id) {
     }
   }
 
-  ledEnableGreen();
+ if (speed_tracking_active) {
+      ledEnableBlue(); 
+    } else {
+      ledEnableGreen();
+    }
 }
 
 
@@ -765,54 +769,85 @@ bool uploadRunResultsAndData() {
   int httpResponseCode = 0;
 
   Serial.printf("SSID:%s PW:%s\n", runInformation.upload_server_ssid.c_str(), runInformation.upload_server_password.c_str());
-  drawAttentionScreen("Uploading run...");
+  drawAttentionScreen("WiFi...");
   WiFi.begin(runInformation.upload_server_ssid, runInformation.upload_server_password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  // Check WiFi connection status
-  if(WiFi.status() == WL_CONNECTED){   
-    HTTPClient http;
-    
-    // Specify destination for HTTP request
-    http.begin(runInformation.upload_server_ip + RUN_RESULT_UPLOAD_PATH);
 
-    // Specify content-type header as text/plain
-    http.addHeader("Content-Type", "text/plain");
-    
-    // Send HTTP POST request
-    httpResponseCode = http.POST(runInformation.device_id + ", " + runInformation.high_speed);
+  bool successfulUpload = false;
+  int attemptCount = 0;
+  
+  char message[128];
 
-    // Free resources
-    http.end();
+
+  while (!successfulUpload)
+  {
+    attemptCount++;
+    sprintf(message, "Results %d %d %d", attemptCount, WiFi.status(), httpResponseCode);
+    drawAttentionScreen(message);
+    delay(1000);
+
+    // Check WiFi connection status
+    if(WiFi.status() == WL_CONNECTED){   
+      HTTPClient http;
+      
+      // Specify destination for HTTP request
+      http.begin(runInformation.upload_server_ip + RUN_RESULT_UPLOAD_PATH);
+
+      // Specify content-type header as text/plain
+      http.addHeader("Content-Type", "text/plain");
+      
+      // Send HTTP POST request
+      httpResponseCode = http.POST(runInformation.device_id + ", " + runInformation.high_speed);
+      if (httpResponseCode >= 200 && httpResponseCode <= 299)
+      {
+        successfulUpload = true;
+      }
+
+      // Free resources
+      http.end();
+    }
   }
 
-  // Check WiFi connection status
-  if(WiFi.status() == WL_CONNECTED){   
-    HTTPClient http;
-    
-    // Specify destination for HTTP request
-    http.begin(runInformation.upload_server_ip + RUN_DATA_UPLOAD_PATH);
+  successfulUpload = false;
+  attemptCount = 0;
 
-    // Specify content-type header as text/plain
-    http.addHeader("Content-Type", "text/plain");
-    
-    // Send HTTP POST request
-    httpResponseCode = http.POST(getRunData());
+  while (!successfulUpload)
+  {
+    attemptCount++;
+    sprintf(message, "Data %d %d %d", attemptCount, WiFi.status(), httpResponseCode);
+    drawAttentionScreen(message);
+    delay(1000);
 
-   
-    if (httpResponseCode == 200) {
-      drawAttentionScreen("Run data uploaded...");
-      Serial.println("Run data uploaded..");
-    } else {
-      Serial.printf("Error %d uploading data\n", httpResponseCode);
-      drawAttentionScreen("Error uploading data\n");
+    // Check WiFi connection status
+    if(WiFi.status() == WL_CONNECTED){   
+      HTTPClient http;
+      
+      // Specify destination for HTTP request
+      http.begin(runInformation.upload_server_ip + RUN_DATA_UPLOAD_PATH);
+
+      // Specify content-type header as text/plain
+      http.addHeader("Content-Type", "text/plain");
+      
+      // Send HTTP POST request
+      httpResponseCode = http.POST(getRunData());
+
+    
+      if (httpResponseCode >= 200 && httpResponseCode <= 299) {
+        drawAttentionScreen("Run Data uploaded...");
+        Serial.println("Data uploaded..");
+        successfulUpload = true;
+      } else {
+        Serial.printf("Error %d uploading data\n", httpResponseCode);
+        drawAttentionScreen("ErrUp: " + httpResponseCode);
+      }
+      
+      // Free resources
+      http.end();
     }
-    
-    // Free resources
-    http.end();
   }
 
   redrawCurrentScreen("", getDeviceFullName(), 0.00, runInformation.high_speed);
@@ -902,7 +937,7 @@ void force_upload(String parameter) {
 void upload_server_ip(String parameter) {
     Serial.println("Running upload_server_ip function");
     runInformation.upload_server_ip = parameter;
-    drawAttentionScreen("Updated server upload IP to " + parameter);
+    drawAttentionScreen("IP - " + parameter);
     redrawCurrentScreen("", getDeviceFullName(), 0.00, runInformation.high_speed);
     // Your function's code here
 }
@@ -975,6 +1010,7 @@ void loop()
       //Serial.printf("Fix Type %d\n", myGNSS.getFixType());
     } else {
       drawGPSLockScreen(getDeviceFullName());
+      ledEnableBlue(); 
     }
   }
 
