@@ -372,12 +372,32 @@ void drawSummaryScreen(double topSpeed) {
   delay(10000); // wait for 10 seconds
 }
 
+#define HISTORY_SIZE 20
 
-void processRunState()
+struct GpsCoordinate history[HISTORY_SIZE];
+int historyIndex = 0;
+
+void addValueToPositionHistory(struct GpsCoordinate value) {
+  history[historyIndex] = value;
+  historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+}
+
+struct GpsCoordinate GetPositionFromHistory(int zeroBasedIndex)
+{
+  int actualIndex = (HISTORY_SIZE + historyIndex - zeroBasedIndex) % HISTORY_SIZE;
+  return history[actualIndex];
+}
+
+// returns true if the finish line has been crossed, false otherwise
+bool processRunState()
 {  
   double mph = getGPSSpeed();
   double latitude = getLatitudeDegrees();
   double longitude = getLongitudeDegrees();
+
+  struct GpsCoordinate curPosition = { latitude, longitude };
+  struct GpsCoordinate prevPosition = GetPositionFromHistory(5); // get the position 5 samples ago
+  addValueToPositionHistory(curPosition);
 
   if (mph > 300) {
     mph = 0;
@@ -419,6 +439,12 @@ void processRunState()
   if (mph > runInformation.high_speed) {
     runInformation.high_speed = mph;
   }
+
+  return crossFinishLine(
+      runInformation.finishLine_left, 
+      runInformation.finishLine_right,
+      prevPosition,
+      curPosition);
 }
 
 
@@ -708,26 +734,6 @@ void setup()
   RunDataFileName = RUN_DATA_FILE_PATH + runInformation.device_id + ".txt";
 }
 
-#define HISTORY_SIZE 20
-
-int history[HISTORY_SIZE];
-int historyIndex = 0;
-
-void addValueToPositionHistory(int value) {
-  history[historyIndex] = value;
-  historyIndex = (historyIndex + 1) % HISTORY_SIZE;
-}
-
-bool checkValueInPositionHistory(int valueToCheck) {
-  for (int i = 0; i < HISTORY_SIZE; i++) {
-    if (history[i] == valueToCheck) {
-      return true;
-    }
-  }
-  return false;
-}
-
-
 String getRunData() {
   // Open the file
   File file = SD.open(RunDataFileName);  // Replace with your file path
@@ -947,10 +953,15 @@ void checkAndExecuteCommand(String command) {
 
 void loop()
 {
+
   if (speed_tracking_active) {
     if (myGNSS.getFixType() >= 3) 
     {
-      processRunState();
+      bool isFinishLineCrossed = processRunState();
+      if (isFinishLineCrossed)
+      {
+        end_run("");
+      }
       //Serial.printf("Fix Type %d\n", myGNSS.getFixType());
     } else {
       drawGPSLockScreen(getDeviceFullName());
