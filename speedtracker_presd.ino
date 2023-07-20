@@ -129,7 +129,7 @@ uint stInfoCurrentIndex = 0; // Current index of the speedtracker array
 SFE_UBLOX_GNSS myGNSS;
 
 String getDeviceFullName() {
-  return runInformation.device_id + '-'+ myGNSS.getSIV();
+  return runInformation.device_id + '-' + myGNSS.getSIV();
 }
 
 void ledEnableRed() {
@@ -232,6 +232,17 @@ void drawAttentionScreen(String attentionString) {
  
   u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
 
+  char speedStr[11];
+  
+ 
+  if (!runInformation.bamf_speed) {
+      sprintf(speedStr, "%06.2f mph", runInformation.high_speed); // add leading zeros if needed
+    } else {
+      sprintf(speedStr, "%06.2f mph", runInformation.bamf_speed); // add leading zeros if needed
+    } 
+
+  u8g2.drawStr(0, 20, speedStr);
+   
   u8g2.drawStr(0, 55, attentionString.c_str());
 
   // Check bamf status
@@ -261,7 +272,7 @@ void drawGPSLockScreen(String device_id) {
   int16_t x = u8g2.getDisplayWidth();
   char* message = "Acquiring GPS ...";
 
-  while (!myGNSS.getGnssFixOk() || myGNSS.getSIV() < 4) {
+  while (!myGNSS.getGnssFixOk() || (myGNSS.getSIV() < 4) || (myGNSS.getSIV() > 50) || (myGNSS.getFixType() < 3)) {
     u8g2.clearBuffer(); // clear the buffer
     u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
     u8g2.drawStr(0, 20, device_id.c_str()); // draw device id
@@ -372,12 +383,32 @@ void drawSummaryScreen(double topSpeed) {
   delay(10000); // wait for 10 seconds
 }
 
+#define HISTORY_SIZE 20
 
-void processRunState()
+struct GpsCoordinate history[HISTORY_SIZE];
+int historyIndex = 0;
+
+void addValueToPositionHistory(struct GpsCoordinate value) {
+  history[historyIndex] = value;
+  historyIndex = (historyIndex + 1) % HISTORY_SIZE;
+}
+
+struct GpsCoordinate GetPositionFromHistory(int zeroBasedIndex)
+{
+  int actualIndex = (HISTORY_SIZE + historyIndex - zeroBasedIndex) % HISTORY_SIZE;
+  return history[actualIndex];
+}
+
+// returns true if the finish line has been crossed, false otherwise
+bool processRunState()
 {  
   double mph = getGPSSpeed();
   double latitude = getLatitudeDegrees();
   double longitude = getLongitudeDegrees();
+
+  struct GpsCoordinate curPosition = { latitude, longitude };
+  struct GpsCoordinate prevPosition = GetPositionFromHistory(5); // get the position 5 samples ago
+  addValueToPositionHistory(curPosition);
 
   if (mph > 300) {
     mph = 0;
@@ -419,6 +450,12 @@ void processRunState()
   if (mph > runInformation.high_speed) {
     runInformation.high_speed = mph;
   }
+
+  return crossFinishLine(
+      runInformation.finishLine_left, 
+      runInformation.finishLine_right,
+      prevPosition,
+      curPosition);
 }
 
 
@@ -696,37 +733,14 @@ void setup()
   //
   // Test GPS connection
   //
-
-  if (!myGNSS.getGnssFixOk() || myGNSS.getSIV() < 4) {
-    ledEnable(LED_RED_OUTPUT_PIN);
-    drawGPSLockScreen(getDeviceFullName());
-  }
-
+ 
+  drawGPSLockScreen(getDeviceFullName());
+  
   ledEnable(LED_GREEN_OUTPUT_PIN); 
   drawReadyScreen(getDeviceFullName());
 
   RunDataFileName = RUN_DATA_FILE_PATH + runInformation.device_id + ".txt";
 }
-
-#define HISTORY_SIZE 20
-
-int history[HISTORY_SIZE];
-int historyIndex = 0;
-
-void addValueToPositionHistory(int value) {
-  history[historyIndex] = value;
-  historyIndex = (historyIndex + 1) % HISTORY_SIZE;
-}
-
-bool checkValueInPositionHistory(int valueToCheck) {
-  for (int i = 0; i < HISTORY_SIZE; i++) {
-    if (history[i] == valueToCheck) {
-      return true;
-    }
-  }
-  return false;
-}
-
 
 String getRunData() {
   // Open the file
@@ -947,10 +961,15 @@ void checkAndExecuteCommand(String command) {
 
 void loop()
 {
+
   if (speed_tracking_active) {
     if (myGNSS.getFixType() >= 3) 
     {
-      processRunState();
+      bool isFinishLineCrossed = processRunState();
+      if (isFinishLineCrossed)
+      {
+        end_run("");
+      }
       //Serial.printf("Fix Type %d\n", myGNSS.getFixType());
     } else {
       drawGPSLockScreen(getDeviceFullName());
