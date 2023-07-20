@@ -9,17 +9,17 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-// // Status LED definitions
-// const int LED_RED_OUTPUT_PIN = 32;
-// const int LED_GREEN_OUTPUT_PIN = 25;
-// const int LED_BLUE_OUTPUT_PIN = 26;
-// const int LED_VCC_PIN = 33;
+// Status LED definitions
+const int LED_RED_OUTPUT_PIN = 32;
+const int LED_GREEN_OUTPUT_PIN = 25;
+const int LED_BLUE_OUTPUT_PIN = 26;
+const int LED_VCC_PIN = 33;
 
-// Kevin special device LED pin mappings
-const int LED_RED_OUTPUT_PIN = 25;
-const int LED_GREEN_OUTPUT_PIN = 27;
-const int LED_BLUE_OUTPUT_PIN = 14;
-const int LED_VCC_PIN = 26;
+// // Kevin special device LED pin mappings
+// const int LED_RED_OUTPUT_PIN = 25;
+// const int LED_GREEN_OUTPUT_PIN = 27;
+// const int LED_BLUE_OUTPUT_PIN = 14;
+// const int LED_VCC_PIN = 26;
 
 // BAMF special values
 #define BAMF_X_POSITION               120
@@ -273,6 +273,8 @@ void drawGPSLockScreen(String device_id) {
   char* message = "Acquiring GPS ...";
 
   while (!myGNSS.getGnssFixOk() || (myGNSS.getSIV() < 4) || (myGNSS.getSIV() > 50) || (myGNSS.getFixType() < 3)) {
+
+    Serial.printf("myGNSS.getGnssFixOk()==%d, myGNSS.getSIV()==%d, myGNSS.getFixType()==%d\n", myGNSS.getGnssFixOk(), myGNSS.getSIV(), myGNSS.getFixType());
     u8g2.clearBuffer(); // clear the buffer
     u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
     u8g2.drawStr(0, 20, device_id.c_str()); // draw device id
@@ -471,11 +473,11 @@ void saveSpeedTrackerInfoToSD() {
   // Open the file for writing
   File file = SD.open(RunDataFileName, FILE_APPEND);
   if (!file) {
-    Serial.printf("Failed to open file %s for writing.", RunDataFileName);
+    Serial.printf("Failed to open file %s for writing.", RunDataFileName.c_str());
     Serial.println();
     return;
   } else {
-    Serial.printf("Opened file %s for writing.", RunDataFileName);                        
+    Serial.printf("Opened file %s for writing.", RunDataFileName.c_str());                        
     Serial.println();
   }
 
