@@ -1,10 +1,8 @@
 device_id=105
-bamf_speed=0.00
 finishLine_left_lng=47.47266
 finishLine_left_lat=-121.75292
 finishLine_right_lng=47.47438
 finishLine_right_lat=-121.7529
-heat_number=2
 upload_server_ssid=CenturyLink8135
 upload_server_password=r5zbjepderfjku
-upload_server_ip=http://192.168.0.9/upload
+upload_server_ip=http://192.168.0.9
