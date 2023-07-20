@@ -177,11 +177,11 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0);
 //
 // Speed tracking related globals
 //
-volatile bool touchDetected = false; // Flag that is set when touch sensor is activated
+//volatile bool touchDetected = false; // Flag that is set when touch sensor is activated
 volatile bool speed_tracking_active = false; // Flag to indicate that the location and speed are being tracked
 unsigned long lastMillis = 0; // Counter to track logging times
-const unsigned long debounceDelay = 150; // Debounce delay in milliseconds
-volatile unsigned long lastDebounceTime = 0; // Stores the last time the button was pressed
+//const unsigned long debounceDelay = 150; // Debounce delay in milliseconds
+//volatile unsigned long lastDebounceTime = 0; // Stores the last time the button was pressed
 
 //
 // GPS helper routines
@@ -959,12 +959,6 @@ void checkAndExecuteCommand(String command) {
 
 void loop()
 {
-    // Check if the touch sensor was pressed
-  if (touchDetected) {
-    touchDetected = false;
-    start_run("");  
-  }
-
   if (speed_tracking_active) {
     if (myGNSS.getFixType() >= 3) 
     {
