@@ -28,7 +28,7 @@ const int LED_VCC_PIN = 26;
 
 #define RUN_CONFIG_FILE_PATH          "/run_config.txt"
 #define RUN_CONFIG_TEMP_FILE_PATH     "/tmp_run_config.txt"
-#define RUN_DATA_FILE_PATH            "/run_data.txt"
+#define RUN_DATA_FILE_PATH            "/run_data_"   //will concat device id and .txt
 
 #define RUN_DATA_UPLOAD_PATH          "/upload_run_data"
 #define RUN_RESULT_UPLOAD_PATH        "/upload_run_result"
@@ -76,6 +76,7 @@ void redrawCurrentScreen(String attention_string, String device_id, double speed
     }
 }
 
+String RunDataFileName;
 //
 // Lat Lng pair
 //
@@ -382,7 +383,7 @@ void processRunState()
     mph = 0;
   }
 
-  if (mph < 6.00) {
+  if (mph < 3.00) {
     drawMainScreen(getDeviceFullName(), 0.00);
   } else {
     drawMainScreen(getDeviceFullName(), mph);
@@ -408,7 +409,7 @@ void processRunState()
     }
   }
 
-  if (mph < 6.00) {
+  if (mph < 3.00) {
     drawMainScreen(getDeviceFullName(), 0.00);
   } else {
     drawMainScreen(getDeviceFullName(), mph);
@@ -424,26 +425,24 @@ void processRunState()
 //Function to save the stInfo array to a JSON file on the SD card
 void saveSpeedTrackerInfoToSD() {
   
-  const char* filename = RUN_DATA_FILE_PATH;
-
-  //char filedata[SPEEDTRACKER_INFO_MAX_ENTRIES * (sizeof(SPEEDTRACKER_INFO) + 3)];
+    //char filedata[SPEEDTRACKER_INFO_MAX_ENTRIES * (sizeof(SPEEDTRACKER_INFO) + 3)];
 
   // Open the file for writing
-  File file = SD.open(filename, FILE_APPEND);
+  File file = SD.open(RunDataFileName, FILE_APPEND);
   if (!file) {
-    Serial.printf("Failed to open file %s for writing.", filename);
+    Serial.printf("Failed to open file %s for writing.", RunDataFileName);
     Serial.println();
     return;
   } else {
-    Serial.printf("Opened file %s for writing.", filename);                        
+    Serial.printf("Opened file %s for writing.", RunDataFileName);                        
     Serial.println();
   }
 
   // Add stInfo array data to the JSON array
   for (int i = 0; i < SPEEDTRACKER_INFO_MAX_ENTRIES; i++) {
     if (stInfo[i].latitude) {
-      file.printf("%s,%10.7f,%10.7f,%10.7f\n", getDeviceFullName().c_str(), stInfo[i].latitude, stInfo[i].longitude, stInfo[i].mph);
-      Serial.printf("%s,%10.7f,%10.7f,%10.7f\n", getDeviceFullName().c_str(), stInfo[i].latitude, stInfo[i].longitude, stInfo[i].mph);
+      file.printf("%s,%10.7f,%10.7f,%10.7f\n", runInformation.device_id.c_str(), stInfo[i].latitude, stInfo[i].longitude, stInfo[i].mph);
+      Serial.printf("%s,%10.7f,%10.7f,%10.7f\n", runInformation.device_id.c_str(), stInfo[i].latitude, stInfo[i].longitude, stInfo[i].mph);
     }
   }
 
@@ -705,6 +704,8 @@ void setup()
 
   ledEnable(LED_GREEN_OUTPUT_PIN); 
   drawReadyScreen(getDeviceFullName());
+
+  RunDataFileName = RUN_DATA_FILE_PATH + runInformation.device_id + ".txt";
 }
 
 #define HISTORY_SIZE 20
@@ -729,7 +730,7 @@ bool checkValueInPositionHistory(int valueToCheck) {
 
 String getRunData() {
   // Open the file
-  File file = SD.open(RUN_DATA_FILE_PATH);  // Replace with your file path
+  File file = SD.open(RunDataFileName);  // Replace with your file path
   String fileData;
 
   if (file) {
@@ -748,7 +749,7 @@ bool uploadRunResultsAndData() {
   int httpResponseCode = 0;
 
   Serial.printf("SSID:%s PW:%s\n", runInformation.upload_server_ssid.c_str(), runInformation.upload_server_password.c_str());
-  drawAttentionScreen("Uploading run data...");
+  drawAttentionScreen("Uploading run...");
   WiFi.begin(runInformation.upload_server_ssid, runInformation.upload_server_password);
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -766,7 +767,7 @@ bool uploadRunResultsAndData() {
     http.addHeader("Content-Type", "text/plain");
     
     // Send HTTP POST request
-    httpResponseCode = http.POST(getDeviceFullName() + ", " + runInformation.high_speed);
+    httpResponseCode = http.POST(runInformation.device_id + ", " + runInformation.high_speed);
 
     // Free resources
     http.end();
