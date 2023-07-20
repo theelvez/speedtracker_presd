@@ -232,6 +232,17 @@ void drawAttentionScreen(String attentionString) {
  
   u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
 
+  char speedStr[11];
+  
+ 
+  if (!runInformation.bamf_speed) {
+      sprintf(speedStr, "%06.2f mph", runInformation.high_speed); // add leading zeros if needed
+    } else {
+      sprintf(speedStr, "%06.2f mph", runInformation.bamf_speed); // add leading zeros if needed
+    } 
+
+  u8g2.drawStr(0, 20, speedStr);
+   
   u8g2.drawStr(0, 55, attentionString.c_str());
 
   // Check bamf status
