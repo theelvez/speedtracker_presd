@@ -273,6 +273,8 @@ void drawGPSLockScreen(String device_id) {
   char* message = "Acquiring GPS ...";
 
   while (!myGNSS.getGnssFixOk() || (myGNSS.getSIV() < 4) || (myGNSS.getSIV() > 50) || (myGNSS.getFixType() < 3)) {
+
+    Serial.printf("myGNSS.getGnssFixOk()==%d, myGNSS.getSIV()==%d, myGNSS.getFixType()==%d\n", myGNSS.getGnssFixOk(), myGNSS.getSIV(), myGNSS.getFixType());
     u8g2.clearBuffer(); // clear the buffer
     u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
     u8g2.drawStr(0, 20, device_id.c_str()); // draw device id
