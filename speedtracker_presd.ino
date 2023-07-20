@@ -232,13 +232,13 @@ void drawAttentionScreen(String attentionString) {
  
   u8g2.setFont(u8g2_font_fub11_tr); // set font size to 8
 
-  char speedStr[11];
+  char speedStr[20];
   
  
   if (!runInformation.bamf_speed) {
-      sprintf(speedStr, "%06.2f mph", runInformation.high_speed); // add leading zeros if needed
+      sprintf(speedStr, "%s - %06.2f mph", runInformation.device_id, runInformation.high_speed); // add leading zeros if needed
     } else {
-      sprintf(speedStr, "%06.2f mph", runInformation.bamf_speed); // add leading zeros if needed
+      sprintf(speedStr, "%s - %06.2f mph", runInformation.device_id, runInformation.bamf_speed); // add leading zeros if needed
     } 
 
   u8g2.drawStr(0, 20, speedStr);
@@ -287,7 +287,11 @@ void drawGPSLockScreen(String device_id) {
     }
   }
 
-  ledEnableGreen();
+ if (speed_tracking_active) {
+      ledEnableBlue(); 
+    } else {
+      ledEnableGreen();
+    }
 }
 
 
@@ -802,11 +806,11 @@ bool uploadRunResultsAndData() {
 
    
     if (httpResponseCode == 200) {
-      drawAttentionScreen("Run data uploaded...");
-      Serial.println("Run data uploaded..");
+      drawAttentionScreen("Data uploaded...");
+      Serial.println("Data uploaded..");
     } else {
       Serial.printf("Error %d uploading data\n", httpResponseCode);
-      drawAttentionScreen("Error uploading data\n");
+      drawAttentionScreen("Error uploading\n");
     }
     
     // Free resources
@@ -900,7 +904,7 @@ void force_upload(String parameter) {
 void upload_server_ip(String parameter) {
     Serial.println("Running upload_server_ip function");
     runInformation.upload_server_ip = parameter;
-    drawAttentionScreen("Updated server upload IP to " + parameter);
+    drawAttentionScreen("IP - " + parameter);
     redrawCurrentScreen("", getDeviceFullName(), 0.00, runInformation.high_speed);
     // Your function's code here
 }
@@ -973,6 +977,7 @@ void loop()
       //Serial.printf("Fix Type %d\n", myGNSS.getFixType());
     } else {
       drawGPSLockScreen(getDeviceFullName());
+      ledEnableBlue(); 
     }
   }
 
