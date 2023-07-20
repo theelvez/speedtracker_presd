@@ -1,10 +1,8 @@
 device_id=000
-bamf_speed=0.00
 finishLine_left_lng=43.78891
 finishLine_left_lat=-114.4831
 finishLine_right_lng=43.78872
 finishLine_right_lat=-114.48295
-heat_number=2
 upload_server_ssid=speedtracker_pit
 upload_server_password=sp33dtrack3r
-upload_server_ip=http://192.168.1.10/upload
+upload_server_ip=http://192.168.1.10
