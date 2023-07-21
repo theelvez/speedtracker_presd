@@ -9,17 +9,17 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-// Status LED definitions
-//const int LED_RED_OUTPUT_PIN = 32;
-//const int LED_GREEN_OUTPUT_PIN = 25;
-//const int LED_BLUE_OUTPUT_PIN = 26;
-//const int LED_VCC_PIN = 33;
+Status LED definitions
+const int LED_RED_OUTPUT_PIN = 32;
+const int LED_GREEN_OUTPUT_PIN = 25;
+const int LED_BLUE_OUTPUT_PIN = 26;
+const int LED_VCC_PIN = 33;
 
-// // Kevin special device LED pin mappings
- const int LED_RED_OUTPUT_PIN = 25;
- const int LED_GREEN_OUTPUT_PIN = 27;
- const int LED_BLUE_OUTPUT_PIN = 14;
- const int LED_VCC_PIN = 26;
+// // // Kevin special device LED pin mappings
+//  const int LED_RED_OUTPUT_PIN = 25;
+//  const int LED_GREEN_OUTPUT_PIN = 27;
+//  const int LED_BLUE_OUTPUT_PIN = 14;
+//  const int LED_VCC_PIN = 26;
 
 // BAMF special values
 #define BAMF_X_POSITION               120
