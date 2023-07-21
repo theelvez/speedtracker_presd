@@ -236,9 +236,9 @@ void drawAttentionScreen(String attentionString) {
   
  
   if (!runInformation.bamf_speed) {
-      sprintf(speedStr, "%s - %06.2f mph", runInformation.device_id, runInformation.high_speed); // add leading zeros if needed
+      sprintf(speedStr, "%s - %06.2f mph", runInformation.device_id.c_str(), runInformation.high_speed); // add leading zeros if needed
     } else {
-      sprintf(speedStr, "%s - %06.2f mph", runInformation.device_id, runInformation.bamf_speed); // add leading zeros if needed
+      sprintf(speedStr, "%s - %06.2f mph", runInformation.device_id.c_str(), runInformation.bamf_speed); // add leading zeros if needed
     } 
 
   u8g2.drawStr(0, 20, speedStr);
