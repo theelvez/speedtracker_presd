@@ -9,7 +9,7 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-Status LED definitions
+//Status LED definitions
 const int LED_RED_OUTPUT_PIN = 32;
 const int LED_GREEN_OUTPUT_PIN = 25;
 const int LED_BLUE_OUTPUT_PIN = 26;
