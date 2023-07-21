@@ -10,16 +10,16 @@
 #include <HTTPClient.h>
 
 // Status LED definitions
-const int LED_RED_OUTPUT_PIN = 32;
-const int LED_GREEN_OUTPUT_PIN = 25;
-const int LED_BLUE_OUTPUT_PIN = 26;
-const int LED_VCC_PIN = 33;
+//const int LED_RED_OUTPUT_PIN = 32;
+//const int LED_GREEN_OUTPUT_PIN = 25;
+//const int LED_BLUE_OUTPUT_PIN = 26;
+//const int LED_VCC_PIN = 33;
 
 // // Kevin special device LED pin mappings
-// const int LED_RED_OUTPUT_PIN = 25;
-// const int LED_GREEN_OUTPUT_PIN = 27;
-// const int LED_BLUE_OUTPUT_PIN = 14;
-// const int LED_VCC_PIN = 26;
+ const int LED_RED_OUTPUT_PIN = 25;
+ const int LED_GREEN_OUTPUT_PIN = 27;
+ const int LED_BLUE_OUTPUT_PIN = 14;
+ const int LED_VCC_PIN = 26;
 
 // BAMF special values
 #define BAMF_X_POSITION               120
@@ -784,7 +784,7 @@ bool uploadRunResultsAndData() {
   while (!successfulUpload)
   {
     attemptCount++;
-    drawAttentionScreen("Results " + attemptCount + "(" + WiFi.status() + "," + httpResponseCode + ")");
+    //drawAttentionScreen("Results " + attemptCount + '(' + WiFi.status() + ',' + httpResponseCode + ')');
     delay(1000);
 
     // Check WiFi connection status
@@ -802,6 +802,7 @@ bool uploadRunResultsAndData() {
       if (httpResponseCode >= 200 && httpResponseCode <= 299)
       {
         successfulUpload = true;
+        drawAttentionScreen("Results Sent");
       }
 
       // Free resources
@@ -815,7 +816,7 @@ bool uploadRunResultsAndData() {
   while (!successfulUpload)
   {
     attemptCount++;
-    drawAttentionScreen("Data " + attemptCount + "(" + WiFi.status() + "," + httpResponseCode + ")");
+    //drawAttentionScreen("Data " + attemptCount + '(' + WiFi.status() + ',' + httpResponseCode + ',');
     delay(1000);
 
     // Check WiFi connection status
@@ -833,12 +834,12 @@ bool uploadRunResultsAndData() {
 
     
       if (httpResponseCode >= 200 && httpResponseCode <= 299) {
-        drawAttentionScreen("Run Data uploaded...");
+        drawAttentionScreen("Run uploaded...");
         Serial.println("Data uploaded..");
         successfulUpload = true;
       } else {
         Serial.printf("Error %d uploading data\n", httpResponseCode);
-        drawAttentionScreen("Error uploading" + httpResponseCode + "\n");
+        drawAttentionScreen("Error uploading" + httpResponseCode + '\n');
       }
       
       // Free resources
